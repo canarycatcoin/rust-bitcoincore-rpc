@@ -2192,21 +2192,31 @@ where
 
 /// deserialize_bip70_network deserializes a Bitcoin Core network according to BIP70
 /// The accepted input variants are: {"main", "test", "signet", "regtest"}
-fn deserialize_bip70_network<'de, D>(deserializer: D) -> Result<Network, D::Error> 
+fn deserialize_bip70_network<'de, D>(deserializer: D) -> Result<Network, D::Error>
 where
-    D: serde::Deserializer<'de>,
+  D: serde::Deserializer<'de>,
 {
     struct NetworkVisitor;
     impl<'de> serde::de::Visitor<'de> for NetworkVisitor {
         type Value = Network;
 
-        fn visit_str<E: serde::de::Error>(self, s: &str) -> Result<Self::Value, E> {
-            Network::from_core_arg(s)
-                .map_err(|_| E::invalid_value(serde::de::Unexpected::Str(s), &"bitcoin network encoded as a string"))
+        fn visit_str<E: serde::de::Error>(self, s: &str) -> Result<Network, E> {
+            // normalize the two main-net names
+            match s {
+                "main"             => Ok(Network::CanaryCatCoin),
+                "bitcoin"          => Ok(Network::Bitcoin),
+                "test" | "testnet" => Ok(Network::Testnet),
+                "signet"           => Ok(Network::Signet),
+                "regtest"          => Ok(Network::Regtest),
+                other        => Err(E::invalid_value(
+                    serde::de::Unexpected::Str(other),
+                    &"one of \"main\", \"test\", \"signet\", or \"regtest\"",
+                )),
+            }
         }
 
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            write!(formatter, "bitcoin network encoded as a string")
+        fn expecting(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+            write!(fmt, "bitcoin network encoded as a string")
         }
     }
 
